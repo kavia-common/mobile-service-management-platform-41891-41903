@@ -1,0 +1,4 @@
+{
+    "command": "source venv/bin/activate && flask run --host <host> --port <port>",
+    "working_directory": "/home/kavia/workspace/code-generation/mobile-service-management-platform-41891-41903/mobile_service_backend"
+}
