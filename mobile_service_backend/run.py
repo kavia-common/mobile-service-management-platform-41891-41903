@@ -1,5 +1,9 @@
+import os
+
 from app import app
 
 if __name__ == "__main__":
-    # Must match work item: backend on port 3001
-    app.run(host="0.0.0.0", port=3001, debug=True)
+    # Allow preview/orchestrator to inject host/port, but keep safe defaults.
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "3001"))
+    app.run(host=host, port=port, debug=True)
