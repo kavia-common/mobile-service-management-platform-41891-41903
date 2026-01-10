@@ -20,7 +20,8 @@ def _build_database_url() -> str:
     if database_url:
         return database_url
 
-    sqlite_path = os.getenv("SQLITE_PATH", "mobile_service.db")
+    # Match requested default: sqlite:///app.db
+    sqlite_path = os.getenv("SQLITE_PATH", "app.db")
     return f"sqlite:///{sqlite_path}"
 
 
