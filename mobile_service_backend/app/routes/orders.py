@@ -12,6 +12,7 @@ blp = Blueprint("Orders", "orders", url_prefix="/api/orders", description="Creat
 
 
 def _claims_or_401() -> dict:
+    """Extract and validate JWT claims from Authorization header."""
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         abort(401, message="Missing Authorization: Bearer token")
@@ -20,6 +21,11 @@ def _claims_or_401() -> dict:
         return decode_token(token)
     except Exception:
         abort(401, message="Invalid or expired token")
+
+
+def _is_admin(claims: dict) -> bool:
+    """Return True if claims represent an admin."""
+    return claims.get("role") == "admin"
 
 
 @blp.route("")
@@ -31,7 +37,7 @@ class OrdersCollection(MethodView):
         session = get_db_session()
 
         q = session.query(Order).order_by(Order.id.desc())
-        if claims.get("role") != "admin":
+        if not _is_admin(claims):
             q = q.filter(Order.user_id == int(claims.get("sub")))
 
         orders = q.all()
@@ -82,7 +88,7 @@ class OrderItem(MethodView):
         if not order:
             abort(404, message="Order not found")
 
-        if claims.get("role") != "admin" and order.user_id != int(claims.get("sub")):
+        if not _is_admin(claims) and order.user_id != int(claims.get("sub")):
             abort(403, message="Not permitted")
 
         _ = order.service
@@ -94,7 +100,7 @@ class OrderItem(MethodView):
     def patch(self, payload, order_id: int):
         """Update order status/notes (admin only)."""
         claims = _claims_or_401()
-        if claims.get("role") != "admin":
+        if not _is_admin(claims):
             abort(403, message="Admin role required")
 
         session = get_db_session()
@@ -107,6 +113,38 @@ class OrderItem(MethodView):
         if "notes" in payload:
             order.notes = payload["notes"]
 
+        session.commit()
+        _ = order.service
+        _ = order.user
+        return order
+
+
+@blp.route("/<int:order_id>/cancel")
+class OrderCancel(MethodView):
+    @blp.response(200, OrderSchema)
+    def post(self, order_id: int):
+        """
+        Cancel an order (owner or admin).
+
+        Cancellation rules:
+        - Order owner can cancel when status is requested/scheduled.
+        - Admin can cancel any order at any time.
+        """
+        claims = _claims_or_401()
+        session = get_db_session()
+
+        order = session.get(Order, order_id)
+        if not order:
+            abort(404, message="Order not found")
+
+        is_owner = order.user_id == int(claims.get("sub"))
+        if not (_is_admin(claims) or is_owner):
+            abort(403, message="Not permitted")
+
+        if not _is_admin(claims) and order.status not in {"requested", "scheduled"}:
+            abort(400, message="Order can no longer be cancelled")
+
+        order.status = "cancelled"
         session.commit()
         _ = order.service
         _ = order.user

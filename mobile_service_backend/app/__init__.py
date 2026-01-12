@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
 from flask_smorest import Api
+from werkzeug.exceptions import HTTPException
 
 from .db import init_db, shutdown_db_session, get_db_session
 from .models import Service, User
@@ -21,7 +22,13 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.url_map.strict_slashes = False
 
-    CORS(app, resources={r"/*": {"origins": "*"}})
+    # Allow the React dev server to access this API.
+    # In production, restrict this to your deployed frontend origin(s).
+    CORS(
+        app,
+        resources={r"/*": {"origins": ["http://localhost:3000"]}},
+        supports_credentials=False,
+    )
 
     app.config["API_TITLE"] = "Mobile Service Management API"
     app.config["API_VERSION"] = "v1"
@@ -40,6 +47,16 @@ def create_app() -> Flask:
     # Database init + teardown (scoped session removal)
     init_db()
     app.teardown_appcontext(shutdown_db_session)
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(e: HTTPException):
+        """
+        Return consistent JSON errors for HTTP exceptions.
+
+        flask-smorest already returns JSON for its own aborts; this handler helps
+        for any uncaught Werkzeug HTTPExceptions.
+        """
+        return {"error": e.name, "message": e.description}, e.code
 
     # Lightweight dev seed route (safe to call multiple times).
     @app.get("/api/dev/seed")
