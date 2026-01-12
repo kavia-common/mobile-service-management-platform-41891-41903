@@ -3,21 +3,23 @@ from flask_cors import CORS
 from flask_smorest import Api
 from werkzeug.exceptions import HTTPException
 
-from .db import init_db, shutdown_db_session, get_db_session
-from .models import Service, User
 from .auth import hash_password
-from .routes.health import blp as health_blp
+from .db import get_db_session, init_db, shutdown_db_session
+from .models import Service, User
 from .routes.auth import blp as auth_blp
-from .routes.services import blp as services_blp
+from .routes.health import blp as health_blp
 from .routes.orders import blp as orders_blp
+from .routes.services import blp as services_blp
 from .routes.users import blp as users_blp
 
 
-def create_app() -> Flask:
+# PUBLIC_INTERFACE
+def create_app() -> tuple[Flask, Api]:
     """
-    Create and configure the Flask application.
+    Create and configure the Flask application and its flask-smorest Api instance.
 
-    The API is exposed under /api/* and OpenAPI docs are available under /docs.
+    Returns:
+        (app, api): A tuple containing the Flask app and the flask-smorest Api wrapper.
     """
     app = Flask(__name__)
     app.url_map.strict_slashes = False
@@ -64,7 +66,7 @@ def create_app() -> Flask:
         """
         Seed the database with a few services and an admin user for local development.
 
-        Requires env var JWT_SECRET to be present for auth flows, but seeding itself does not require auth.
+        Seeding itself does not require auth.
         """
         session = get_db_session()
 
@@ -115,8 +117,8 @@ def create_app() -> Flask:
         session.commit()
         return {"ok": True, "message": "Seeded demo data (admin: admin@example.com / admin123)"}
 
-    return app
+    return app, api
 
 
-app = create_app()
-api = Api(app)
+# Expose module-level app/api used by run.py and generate_openapi.py
+app, api = create_app()

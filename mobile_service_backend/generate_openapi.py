@@ -1,6 +1,8 @@
 import json
 import os
-from app import app, api  # import your Flask app and Api instance
+
+from app import api, app  # Import the Flask app and the flask-smorest Api instance
+
 
 with app.app_context():
     # flask-smorest stores the spec in api.spec
